@@ -13,6 +13,11 @@
 
   const FLIP_DELAY_START_MS = 800;
   const FLIP_INTERVAL_MS = 200;
+  const FLIP_ANIM_MS = 450; // keep in sync with @keyframes coin-flip duration
+  const FLIP_GROUP_GAP_MS = 300;
+
+  // Pure grouping / scheduling lives in flip-order.js so it can be unit-tested.
+  const { groupAndSortLines, runFlipSchedule } = window.ReversiFlipOrder;
 
   const boardEl = document.getElementById('board');
   const overlayEl = document.getElementById('overlay');
@@ -23,6 +28,7 @@
 
   let state = null;
   let animating = false;
+  let pendingPopstate = null;
 
   // ---------- State helpers ----------
   function initialState() {
@@ -55,7 +61,7 @@
   function flipsForMove(board, r, c, color) {
     if (board[r][c] !== EMPTY) return [];
     const opp = color === BLACK ? WHITE : BLACK;
-    const allLines = [];
+    const out = [];
     for (const [dr, dc] of DIRS) {
       const line = [];
       let nr = r + dr, nc = c + dc;
@@ -65,10 +71,10 @@
         nc += dc;
       }
       if (line.length > 0 && inside(nr, nc) && board[nr][nc] === color) {
-        allLines.push(line);
+        out.push({ dir: [dr, dc], line });
       }
     }
-    return allLines;
+    return out;
   }
 
   function hasValidMove(board, color) {
@@ -138,13 +144,15 @@
     for (const cell of boardEl.children) cell.classList.remove('valid');
   }
 
-  function renderHand(handEl, color, count) {
+  // Each stripe represents a single double-sided disc viewed edge-on: the
+  // top half shows one face color and the bottom half shows the other.
+  // That's baked into the .hand-piece CSS background, so renderHand just
+  // syncs the DOM child count to the state count (no color alternation).
+  function renderHand(handEl, _color, count) {
     while (handEl.children.length > count) handEl.lastElementChild.remove();
-    const miniColor = color === BLACK ? 'black' : 'white';
     while (handEl.children.length < count) {
       const m = document.createElement('div');
       m.className = 'hand-piece';
-      m.dataset.miniColor = miniColor;
       handEl.appendChild(m);
     }
   }
@@ -155,7 +163,6 @@
     const rect = last.getBoundingClientRect();
     const ghost = document.createElement('div');
     ghost.className = 'hand-piece hand-piece-ghost';
-    ghost.dataset.miniColor = last.dataset.miniColor;
     Object.assign(ghost.style, {
       position: 'fixed',
       left: rect.left + 'px',
@@ -163,14 +170,15 @@
       width: rect.width + 'px',
       height: rect.height + 'px',
       margin: '0',
+      maxHeight: 'none',
       pointerEvents: 'none',
     });
-    const dy = handEl.closest('.player-black') ? -12 : 12;
+    const dy = handEl.closest('.player-black') ? -18 : 18;
     document.body.appendChild(ghost);
     last.remove();
     requestAnimationFrame(() => {
       ghost.style.opacity = '0';
-      ghost.style.transform = `scale(0.35) translateY(${dy}px)`;
+      ghost.style.transform = `scale(0.3) translateY(${dy}px)`;
     });
     const done = () => { if (ghost.parentNode) ghost.remove(); };
     ghost.addEventListener('transitionend', done, { once: true });
@@ -265,18 +273,22 @@
     getCell(r, c).appendChild(pieceEl);
     animateRemoveHandPiece(placed === BLACK ? handBlackEl : handWhiteEl);
 
-    // 2) wait, then flip lines in parallel; within each line, closest-first stepwise.
-    //    We update state.board as each flip *starts* so the board is final once
-    //    all line kick-offs complete.
+    // 2) wait, then flip by direction group. Groups run sequentially in order of
+    //    total piece count desc (ties: vertical > horizontal > diagonal). Within a
+    //    group, lines animate in parallel and pieces in a line are spaced by
+    //    FLIP_INTERVAL_MS. Between groups we wait FLIP_ANIM_MS (last flip finishes)
+    //    + FLIP_GROUP_GAP_MS. state.board is updated as each flip *starts*.
+    const orderedGroups = groupAndSortLines(lines);
     await sleep(FLIP_DELAY_START_MS);
-    await Promise.all(lines.map(async (line) => {
-      for (let i = 0; i < line.length; i++) {
-        const [fr, fc] = line[i];
+    await runFlipSchedule(orderedGroups, {
+      flip: ([fr, fc]) => {
         state.board[fr][fc] = placed;
         flipPieceAnimated(fr, fc, placed);
-        if (i < line.length - 1) await sleep(FLIP_INTERVAL_MS);
-      }
-    }));
+      },
+      sleep,
+      interval: FLIP_INTERVAL_MS,
+      groupGap: FLIP_ANIM_MS + FLIP_GROUP_GAP_MS,
+    });
 
     // 3) determine next turn — switch as soon as the final flip has started.
     const opp = placed === BLACK ? WHITE : BLACK;
@@ -295,15 +307,26 @@
     history.pushState({ state: clone(state) }, '');
 
     // 5) wait for the in-flight coin-flip to finish before unblocking input.
-    await sleep(450);
+    await sleep(FLIP_ANIM_MS);
     animating = false;
+    if (pendingPopstate) {
+      const s = pendingPopstate;
+      pendingPopstate = null;
+      state = clone(s);
+      snapRender();
+    }
   }
 
   // ---------- History ----------
   window.addEventListener('popstate', (e) => {
-    if (animating) return;
     const s = e.state && e.state.state;
     if (!s) return;
+    if (animating) {
+      // URL already rolled; defer state swap until animation ends so we don't
+      // desync from history. Last-one-wins if multiple popstates queue up.
+      pendingPopstate = s;
+      return;
+    }
     state = clone(s);
     snapRender();
   });

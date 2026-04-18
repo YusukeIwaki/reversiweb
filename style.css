@@ -28,13 +28,18 @@ html, body {
 
 /* ---------- Player panels ---------- */
 .player {
-  width: 100%;
-  max-width: 720px;
+  /* Match the board's width so panel edges and tray-side spacing align
+     visually with the board's wooden frame. */
+  width: min(92vw, calc(100vh - 284px));
+  min-height: 110px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 10px 18px;
-  border-radius: 14px;
+  /* 12px horizontal padding + 2px border = 14px visual inset on each side,
+     matching the board's 14px wooden frame. 14px gap between icon and
+     tray gives the same 14px of space on the tray's left. */
+  gap: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
   background: #262626;
   border: 2px solid transparent;
   transition: border-color 0.25s, background 0.25s;
@@ -53,8 +58,11 @@ html, body {
 }
 
 .player-piece-wrap {
-  width: 44px;
-  height: 44px;
+  /* Match the board piece diameter so the hand icon reads the same as
+     the pieces on the board (on iPad Mini: 0.84 * (board_inner/8) ≈ 70px). */
+  width: 70px;
+  height: 70px;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -76,87 +84,88 @@ html, body {
   box-shadow: inset -2px -3px 6px rgba(0,0,0,0.18), 0 2px 4px rgba(0,0,0,0.5);
 }
 
-.player-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* ---------- Hand tray inside player panel ---------- */
+/* Tray is a horizontal strip; each .hand-piece is a tall thin vertical bar
+   (a disc viewed edge-on). Alternating B/W across the row creates the
+   striped "noodle" look from the reference photos. Stripes are sized to be
+   noticeably smaller than the pieces on the board. */
+.tray {
+  flex: 1 1 auto;
+  align-self: stretch;
   min-width: 0;
-}
-
-.player-label {
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  color: #aaa;
-}
-
-.player-hand {
+  margin: 4px 0;
   display: flex;
-  align-items: center;
-  min-height: 30px;
-  padding: 4px 12px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #0c0c0c, #1b1b1b);
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: stretch;
+  padding: 4px 5px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #050505, #1a1a1a 50%, #050505);
   box-shadow:
-    inset 0 2px 3px rgba(0,0,0,0.7),
-    inset 0 -1px 1px rgba(255,255,255,0.03);
+    inset 0 0 0 1px #000,
+    inset 0 2px 3px rgba(0,0,0,0.8),
+    0 1px 2px rgba(0,0,0,0.4);
   overflow: hidden;
 }
 
+/* Point-symmetric layout: rotating the screen 180° around the board maps
+   the bottom (black) panel onto the top (white) panel.
+   - Black panel (default row): [icon][tray] with stripes piled at the
+     tray's LEFT (flex-start), empty on the right.
+   - White panel (row-reverse at both panel and tray level): [tray][icon]
+     with stripes piled at the tray's RIGHT, empty on the left.
+   row-reverse on the tray itself also ensures the last-appended stripe
+   sits at the inner edge of the pile, so removing handEl.lastElementChild
+   always takes from the "top of stack" in both trays. */
+.player-white {
+  flex-direction: row-reverse;
+}
+.player-white .tray {
+  flex-direction: row-reverse;
+}
+
+/* Each stripe = one double-sided disc on edge. Left half is the black
+   face, right half the white face, with a darker seam in between.
+   Width is FIXED so pieces don't get thicker as the hand shrinks — they
+   stay the same size and the tray just gains empty space at the end. */
 .hand-piece {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
-  border-radius: 50%;
+  flex: 0 0 15px;
+  width: 15px;
+  height: 100%;
+  border-radius: 1px;
+  background:
+    linear-gradient(90deg,
+      #2a2a2a 0%,
+      #0a0a0a 40%,
+      #050505 49%,
+      #2a2a2a 50%,
+      #e6e6e6 51%,
+      #fafafa 60%,
+      #dcdcdc 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    inset 0 -1px 0 rgba(0,0,0,0.4),
+    0 1px 1px rgba(0,0,0,0.55);
   transition: opacity 0.3s ease-out, transform 0.3s ease-out;
 }
 .hand-piece + .hand-piece {
-  margin-left: -6px;
-}
-
-.hand-piece[data-mini-color="black"] {
-  background: radial-gradient(circle at 30% 28%, #5a5a5a, #050505 70%);
-  box-shadow:
-    inset -1px -2px 3px rgba(255,255,255,0.08),
-    0 1px 2px rgba(0,0,0,0.55);
-}
-.hand-piece[data-mini-color="white"] {
-  background: radial-gradient(circle at 30% 28%, #ffffff, #c9c9c9 70%);
-  box-shadow:
-    inset -1px -2px 3px rgba(0,0,0,0.18),
-    0 1px 2px rgba(0,0,0,0.55);
+  margin-left: 1px;
 }
 
 .hand-piece.leaving { opacity: 0; }
-.player-white .hand-piece.leaving { transform: scale(0.35) translateY(10px); }
-.player-black .hand-piece.leaving { transform: scale(0.35) translateY(-10px); }
-
-.turn-indicator {
-  font-size: 12px;
-  letter-spacing: 0.1em;
-  color: #f5c34a;
-  font-weight: 700;
-  opacity: 0;
-  transition: opacity 0.25s;
-}
-.player.active .turn-indicator { opacity: 1; }
-
-.player.gameover .turn-indicator {
-  color: #4ad17a;
-  opacity: 0;
-}
-.player.gameover.winner .turn-indicator {
-  opacity: 1;
-}
+.player-white .hand-piece.leaving { transform: scale(0.3) translateY(14px); }
+.player-black .hand-piece.leaving { transform: scale(0.3) translateY(-14px); }
 
 /* ---------- Board ---------- */
 .board-wrapper {
   position: relative;
-  width: min(92vw, calc(100vh - 260px));
+  /* panels (110px each) + app paddings + gaps ≈ 284px vertical budget */
+  width: min(92vw, calc(100vh - 284px));
   aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
 }
 
 .board {
