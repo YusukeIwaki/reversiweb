@@ -1,0 +1,6 @@
+node_modules/
+.playwright-mcp/
+tests/videos/
+tests/screenshots/
+tests/record.mjs
+.DS_Store

@@ -1,0 +1,328 @@
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #1a1a1a;
+  color: #eee;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  gap: 12px;
+}
+
+/* ---------- Player panels ---------- */
+.player {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 18px;
+  border-radius: 14px;
+  background: #262626;
+  border: 2px solid transparent;
+  transition: border-color 0.25s, background 0.25s;
+  position: relative;
+}
+
+.player.active {
+  border-color: #f5c34a;
+  background: #2f2a1a;
+  box-shadow: 0 0 14px rgba(245, 195, 74, 0.25);
+}
+
+.player.gameover.winner {
+  border-color: #4ad17a;
+  background: #1d2f1f;
+}
+
+.player-piece-wrap {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.piece-mini {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.piece-mini[data-mini-color="black"] {
+  background: radial-gradient(circle at 30% 30%, #5a5a5a, #050505 70%);
+  box-shadow: inset -2px -3px 6px rgba(255,255,255,0.08), 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.piece-mini[data-mini-color="white"] {
+  background: radial-gradient(circle at 30% 30%, #ffffff, #c9c9c9 70%);
+  box-shadow: inset -2px -3px 6px rgba(0,0,0,0.18), 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.player-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.player-label {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  color: #aaa;
+}
+
+.player-hand {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 4px 12px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #0c0c0c, #1b1b1b);
+  box-shadow:
+    inset 0 2px 3px rgba(0,0,0,0.7),
+    inset 0 -1px 1px rgba(255,255,255,0.03);
+  overflow: hidden;
+}
+
+.hand-piece {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border-radius: 50%;
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+.hand-piece + .hand-piece {
+  margin-left: -6px;
+}
+
+.hand-piece[data-mini-color="black"] {
+  background: radial-gradient(circle at 30% 28%, #5a5a5a, #050505 70%);
+  box-shadow:
+    inset -1px -2px 3px rgba(255,255,255,0.08),
+    0 1px 2px rgba(0,0,0,0.55);
+}
+.hand-piece[data-mini-color="white"] {
+  background: radial-gradient(circle at 30% 28%, #ffffff, #c9c9c9 70%);
+  box-shadow:
+    inset -1px -2px 3px rgba(0,0,0,0.18),
+    0 1px 2px rgba(0,0,0,0.55);
+}
+
+.hand-piece.leaving { opacity: 0; }
+.player-white .hand-piece.leaving { transform: scale(0.35) translateY(10px); }
+.player-black .hand-piece.leaving { transform: scale(0.35) translateY(-10px); }
+
+.turn-indicator {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: #f5c34a;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.player.active .turn-indicator { opacity: 1; }
+
+.player.gameover .turn-indicator {
+  color: #4ad17a;
+  opacity: 0;
+}
+.player.gameover.winner .turn-indicator {
+  opacity: 1;
+}
+
+/* ---------- Board ---------- */
+.board-wrapper {
+  position: relative;
+  width: min(92vw, calc(100vh - 260px));
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.board {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  background: #1f7a3a;
+  border: 14px solid #3a210e;
+  border-radius: 10px;
+  box-shadow:
+    inset 0 0 0 2px #0a3015,
+    0 10px 30px rgba(0,0,0,0.6),
+    0 4px 8px rgba(0,0,0,0.4);
+  background-image:
+    linear-gradient(135deg, rgba(255,255,255,0.04), rgba(0,0,0,0.06));
+  position: relative;
+}
+
+/* Wooden grain hint on the frame */
+.board::before {
+  content: "";
+  position: absolute;
+  inset: -14px;
+  border-radius: 10px;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.04) 0 2px, transparent 2px 6px),
+    linear-gradient(180deg, #4a2a14 0%, #2c1808 100%);
+  border: 14px solid transparent;
+  background-clip: border-box;
+  z-index: -1;
+}
+
+.cell {
+  position: relative;
+  border-right: 1px solid #0a3015;
+  border-bottom: 1px solid #0a3015;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell:nth-child(8n) { border-right: none; }
+.cell:nth-last-child(-n+8) { border-bottom: none; }
+
+/* Star points (Othello marker dots) at corners of cells (2,2)(2,6)(6,2)(6,6) */
+.cell.star::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #07251a;
+  bottom: -5px;
+  right: -5px;
+  z-index: 1;
+}
+
+.cell.valid::before {
+  content: "";
+  position: absolute;
+  width: 24%;
+  height: 24%;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.22);
+  pointer-events: none;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(0.85); opacity: 0.6; }
+  50% { transform: scale(1); opacity: 1; }
+}
+
+/* ---------- Pieces ---------- */
+.piece {
+  width: 84%;
+  height: 84%;
+  position: relative;
+  pointer-events: none;
+  z-index: 2;
+  border-radius: 50%;
+}
+
+/* Two stacked face layers; the visible color is controlled by data-color.
+   Flip animation is a coin-flip: scaleX 1 -> 0 -> 1. The script swaps
+   data-color at mid-flip so the new face appears as it scales back. */
+
+.piece::before,
+.piece::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  backface-visibility: hidden;
+}
+
+.piece::before {
+  background: radial-gradient(circle at 32% 28%, #6a6a6a, #0a0a0a 65%, #000 100%);
+  box-shadow:
+    inset -3px -4px 8px rgba(255,255,255,0.10),
+    inset 3px 4px 8px rgba(0,0,0,0.5),
+    0 3px 6px rgba(0,0,0,0.55);
+  opacity: 1;
+}
+
+.piece::after {
+  background: radial-gradient(circle at 32% 28%, #ffffff, #d6d6d6 65%, #b8b8b8 100%);
+  box-shadow:
+    inset -3px -4px 8px rgba(0,0,0,0.15),
+    inset 3px 4px 8px rgba(255,255,255,0.55),
+    0 3px 6px rgba(0,0,0,0.55);
+  opacity: 0;
+}
+
+.piece[data-color="white"]::before { opacity: 0; }
+.piece[data-color="white"]::after  { opacity: 1; }
+
+.piece.flipping {
+  animation: coin-flip 0.45s ease-in-out;
+}
+
+@keyframes coin-flip {
+  0%   { transform: scaleX(1); }
+  50%  { transform: scaleX(0.05); }
+  100% { transform: scaleX(1); }
+}
+
+.piece.appear {
+  animation: drop 0.28s ease-out;
+}
+
+@keyframes drop {
+  0%   { transform: translateY(-18px) scale(0.4); opacity: 0; }
+  60%  { transform: translateY(0) scale(1.05); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* No-animation mode for popstate restoration */
+.no-anim .piece,
+.no-anim .piece-mini,
+.no-anim .hand-piece {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* ---------- Game over overlay ---------- */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.7);
+  background: rgba(0,0,0,0.35);
+  border-radius: 10px;
+  pointer-events: none;
+}
+.overlay.visible { display: flex; }
+
+/* ---------- Layout per orientation ---------- */
+@media (orientation: portrait) {
+  .app { padding: 20px 16px; }
+}
