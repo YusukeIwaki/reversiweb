@@ -8,11 +8,20 @@
 index.html        ボディ全体を組む。SPA だが 1 画面のみ
 style.css         レイアウト、盤面、コマの見た目、アニメーション
 script.js         ゲームロジック・履歴管理・DOM 更新（IIFE で完結）
-package.json      テスト用 playwright のみ依存
+package.json      テスト・録画用 playwright のみ依存
 tests/ipad.mjs    iPad Mini (WebKit) エミュレーションでの自動検証
+tests/record.mjs  README.md 用 GIF 元動画 (webm) を録画するスクリプト
+demo.gif         README.md に貼ってある動作デモ。**git 管理対象**
 ```
 
 外部ライブラリ・ビルドツールは持ち込まない。`script.js` は IIFE 1 個。
+
+`.gitignore` の対象（コミットしない）:
+- `node_modules/`
+- `tests/videos/`（録画の生成物。webm はリポジトリに含めない）
+- `tests/screenshots/`（テスト時の中間生成物）
+- `.playwright-mcp/`（Playwright MCP の作業ディレクトリ）
+- `.DS_Store`
 
 ## ローカル起動と検証
 
@@ -72,6 +81,54 @@ Playwright MCP（`mcp__playwright__*` ツール群）が利用可能なら、対
 - 想定ビューポート: iPad Mini (768×1024) を最小ターゲット。それ以上の iPad (810×1080 等) でも崩れない CSS にしてある。
 - 盤サイズは `min(92vw, calc(100vh - 260px))` の正方形。`260px` はプレイヤーパネル 2 段 + paddings の見込み値。プレイヤーパネルの高さを変更するならここも追従させる。
 - `meta viewport` で `maximum-scale=1, user-scalable=no` を指定し、Safari のダブルタップズームを抑止している。
+
+## デモ動画 (README.md の `demo.gif`) を撮り直すとき
+
+**ゲームの見た目に変更を入れたら必ず撮り直す。** 触っていい想定の対象は `index.html` / `style.css` / `script.js` のいずれか。盤面・コマ・プレイヤーパネル・アニメーションタイミングなどに手を入れたら、撮り直して `demo.gif` をリプレースする。
+
+### 手順
+
+```sh
+# 1. ローカルサーバーを起動
+npx --yes serve -p 5173 -L .
+
+# 2. 録画（tests/videos/demo.webm が生成される。約13–15秒）
+node tests/record.mjs
+
+# 3. webm → GIF（ffmpeg 必須）
+ffmpeg -y -i tests/videos/demo.webm \
+  -vf "fps=12,scale=420:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=4" \
+  -loop 0 demo.gif
+
+# 4. 差し替えた demo.gif だけコミット（webm は .gitignore で除外済み）
+git add demo.gif && git commit -m "Refresh demo.gif"
+```
+
+### `tests/record.mjs` の挙動
+
+- iPad Mini (768×1024 / WebKit) で起動
+- 「ヒントが出ているマスのうち中央寄り」を 5 手連続で打つ → page back ×2 → page forward ×2、で約 13.5 秒
+- ロジックを変えるなら、合計の wall clock が 12〜18 秒に収まるよう `sleep(...)` を調整する。長すぎると GIF が肥大化、短すぎると流れが追えない
+- 録画サイズは context option で `768×1024` を明示しているので、いじるときは ffmpeg の `scale=` 値も追従させる
+
+### `demo.gif` のサイズ目標
+
+- 1〜2 MB に収める（README に貼って実用に耐える上限）。`scale=420`、`fps=12`、`bayer_scale=4` が現状のバランス点
+- 大きくしたいなら `scale=480` まで。それ以上は GitHub の README 表示で重くなる
+
+## GitHub Pages
+
+- **公開 URL**: https://yusukeiwaki.github.io/reversiweb/
+- 設定: `build_type=legacy`, `source.branch=main`, `source.path=/`（branch ベースの静的配信）
+- `main` への push が直接反映される。Actions ワークフローも `gh-pages` ブランチも使わない
+- 設定確認: `gh api repos/YusukeIwaki/reversiweb/pages`
+- 設定変更が必要なときの例:
+  ```sh
+  gh api -X PUT repos/YusukeIwaki/reversiweb/pages \
+    -f 'build_type=legacy' -f 'source[branch]=main' -f 'source[path]=/'
+  ```
+- `index.html` がリポジトリ root にあるので Pages のトップでそのままゲームが動く。`README.md` は GitHub のリポジトリトップに表示されるだけで Pages 側には出ない（重複しないので OK）
+- ビルド状態: `gh api repos/YusukeIwaki/reversiweb/pages/builds/latest`
 
 ## 触るときの注意
 
