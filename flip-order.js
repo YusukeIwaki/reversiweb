@@ -8,20 +8,30 @@
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.ReversiFlipOrder = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
-  // Tie-breaker priority: smaller wins, so vertical > horizontal > diagonal.
-  const KIND_PRIORITY = { v: 0, h: 1, d: 2 };
+  // Each of the 8 directions is its own group, so a single move never fires
+  // two directions in parallel (issue #1). Tie-breaker priority: smaller wins
+  // — vertical (u,d) first, then horizontal (l,r), then \ axis (ul,dr),
+  // then / axis (ur,dl).
+  const KIND_PRIORITY = {
+    u: 0, d: 1,
+    l: 2, r: 3,
+    ul: 4, dr: 5,
+    ur: 6, dl: 7,
+  };
 
   function dirKind(dr, dc) {
-    if (dc === 0) return 'v';
-    if (dr === 0) return 'h';
-    return 'd';
+    if (dc === 0) return dr < 0 ? 'u' : 'd';
+    if (dr === 0) return dc < 0 ? 'l' : 'r';
+    if (dr < 0) return dc < 0 ? 'ul' : 'ur';
+    return dc < 0 ? 'dl' : 'dr';
   }
 
   // Input: flipsForMove output — [{dir:[dr,dc], line:[[r,c],...]}, ...]
   // Output: [{kind, lines:[[[r,c],...],...]}, ...] ordered by total piece
-  //   count descending, ties broken by KIND_PRIORITY (v,h,d).
+  //   count descending, ties broken by KIND_PRIORITY.
   function groupAndSortLines(lines) {
-    const groups = { v: [], h: [], d: [] };
+    const groups = {};
+    for (const k of Object.keys(KIND_PRIORITY)) groups[k] = [];
     for (const { dir, line } of lines) groups[dirKind(dir[0], dir[1])].push(line);
     const countOf = (ls) => ls.reduce((s, l) => s + l.length, 0);
     return Object.keys(groups)

@@ -15,7 +15,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('dirKind', () => {
-  test('classifies each of the 8 directions', async ({ page }) => {
+  test('classifies each of the 8 directions uniquely', async ({ page }) => {
     const r = await page.evaluate(() => {
       const { dirKind } = window.ReversiFlipOrder;
       return {
@@ -25,19 +25,19 @@ test.describe('dirKind', () => {
         dl: dirKind(1, -1), dr: dirKind(1, 1),
       };
     });
-    expect(r.up).toBe('v');
-    expect(r.down).toBe('v');
-    expect(r.left).toBe('h');
-    expect(r.right).toBe('h');
-    expect(r.ul).toBe('d');
-    expect(r.ur).toBe('d');
-    expect(r.dl).toBe('d');
-    expect(r.dr).toBe('d');
+    expect(r.up).toBe('u');
+    expect(r.down).toBe('d');
+    expect(r.left).toBe('l');
+    expect(r.right).toBe('r');
+    expect(r.ul).toBe('ul');
+    expect(r.ur).toBe('ur');
+    expect(r.dl).toBe('dl');
+    expect(r.dr).toBe('dr');
   });
 });
 
 test.describe('groupAndSortLines', () => {
-  test('orders groups by total piece count desc (v=2, h=1, d=3 → d, v, h)', async ({ page }) => {
+  test('orders groups by total piece count desc (up=2, right=1, up-right=3 → ur, u, r)', async ({ page }) => {
     const kinds = await page.evaluate(() => {
       return window.ReversiFlipOrder.groupAndSortLines([
         { dir: [-1, 0], line: [[2,3],[1,3]] },
@@ -45,33 +45,43 @@ test.describe('groupAndSortLines', () => {
         { dir: [-1, 1], line: [[3,4],[2,5],[1,6]] },
       ]).map(g => g.kind);
     });
-    expect(kinds).toEqual(['d', 'v', 'h']);
+    expect(kinds).toEqual(['ur', 'u', 'r']);
   });
 
-  test('breaks ties with vertical > horizontal > diagonal', async ({ page }) => {
+  test('breaks ties with u,d,l,r,ul,dr,ur,dl priority order', async ({ page }) => {
     const kinds = await page.evaluate(() => {
       return window.ReversiFlipOrder.groupAndSortLines([
-        { dir: [0, 1], line: [[4,5]] },
-        { dir: [1, 0], line: [[5,3]] },
-        { dir: [1, 1], line: [[5,4]] },
+        { dir: [1, -1], line: [[5,2]] }, // dl (/)
+        { dir: [0, 1],  line: [[4,5]] }, // r
+        { dir: [-1, 1], line: [[3,5]] }, // ur (/)
+        { dir: [1, 0],  line: [[5,3]] }, // d
+        { dir: [1, 1],  line: [[5,4]] }, // dr (\)
+        { dir: [-1, -1], line: [[3,2]] },// ul (\)
+        { dir: [0, -1], line: [[4,2]] }, // l
+        { dir: [-1, 0], line: [[3,3]] }, // u
       ]).map(g => g.kind);
     });
-    expect(kinds).toEqual(['v', 'h', 'd']);
+    expect(kinds).toEqual(['u', 'd', 'l', 'r', 'ul', 'dr', 'ur', 'dl']);
   });
 
-  test('merges multiple lines of the same kind into one group', async ({ page }) => {
+  test('places each direction into its own group (issue #1)', async ({ page }) => {
+    // Even when two lines share a visual axis (up + down on the vertical axis,
+    // or left + right on the horizontal axis), they must end up in separate
+    // groups so they don't flip simultaneously.
     const out = await page.evaluate(() => {
       return window.ReversiFlipOrder.groupAndSortLines([
         { dir: [1, 0], line: [[5,3]] },
         { dir: [-1, 0], line: [[2,3],[1,3]] },
         { dir: [0, 1], line: [[4,5]] },
-      ]);
+        { dir: [0, -1], line: [[4,1]] },
+      ]).map(g => ({ kind: g.kind, pieces: g.lines.reduce((s, l) => s + l.length, 0) }));
     });
-    expect(out).toHaveLength(2);
-    expect(out[0].kind).toBe('v');
-    expect(out[0].lines).toHaveLength(2);
-    expect(out[1].kind).toBe('h');
-    expect(out[1].lines).toHaveLength(1);
+    expect(out).toEqual([
+      { kind: 'u', pieces: 2 },
+      { kind: 'd', pieces: 1 },
+      { kind: 'l', pieces: 1 },
+      { kind: 'r', pieces: 1 },
+    ]);
   });
 
   test('empty input yields empty array', async ({ page }) => {
@@ -90,8 +100,8 @@ test.describe('runFlipSchedule', () => {
       const flip = (cell) => events.push({ t: now, cell });
       await runFlipSchedule(
         [
-          { kind: 'v', lines: [[[4,5]]] },
-          { kind: 'h', lines: [[[3,4]]] },
+          { kind: 'u', lines: [[[4,5]]] },
+          { kind: 'r', lines: [[[3,4]]] },
         ],
         { flip, sleep, interval: 200, groupGap: 750 },
       );
@@ -110,7 +120,7 @@ test.describe('runFlipSchedule', () => {
       const sleep = (ms) => { now += ms; return Promise.resolve(); };
       const flip = (cell) => events.push({ t: now, cell });
       await runFlipSchedule(
-        [{ kind: 'v', lines: [[[2,3],[1,3],[0,3]]] }],
+        [{ kind: 'u', lines: [[[2,3],[1,3],[0,3]]] }],
         { flip, sleep, interval: 200, groupGap: 750 },
       );
       return events.map(e => e.t);
@@ -118,7 +128,10 @@ test.describe('runFlipSchedule', () => {
     expect(times).toEqual([0, 200, 400]);
   });
 
-  test('starts parallel single-piece lines at the same time', async ({ page }) => {
+  test('starts parallel lines within a single group at the same time', async ({ page }) => {
+    // runFlipSchedule still supports multiple lines per group; groupAndSortLines
+    // just no longer produces that shape in practice (each direction is its
+    // own group). The scheduler contract is unchanged and tested directly here.
     const times = await page.evaluate(async () => {
       const { runFlipSchedule } = window.ReversiFlipOrder;
       const events = [];
@@ -126,7 +139,7 @@ test.describe('runFlipSchedule', () => {
       const sleep = (ms) => { now += ms; return Promise.resolve(); };
       const flip = (cell) => events.push({ t: now, cell });
       await runFlipSchedule(
-        [{ kind: 'v', lines: [[[2,3]], [[5,3]]] }],
+        [{ kind: 'u', lines: [[[2,3]], [[5,3]]] }],
         { flip, sleep, interval: 200, groupGap: 750 },
       );
       return events.map(e => e.t);
@@ -153,7 +166,7 @@ test.describe('runFlipSchedule', () => {
       const { runFlipSchedule } = window.ReversiFlipOrder;
       const sleepMs = [];
       await runFlipSchedule(
-        [{ kind: 'v', lines: [[[4,5]]] }],
+        [{ kind: 'u', lines: [[[4,5]]] }],
         {
           flip: () => {},
           sleep: (ms) => { sleepMs.push(ms); return Promise.resolve(); },
