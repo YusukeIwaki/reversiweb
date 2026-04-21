@@ -17,7 +17,7 @@ export default defineConfig({
   projects: [
     {
       name: 'ipad',
-      testMatch: /ipad\.spec\.mjs$/,
+      testMatch: /(ipad|game-end)\.spec\.mjs$/,
       // iPad Mini portrait on WebKit only. We don't test this suite on Chromium
       // because the coin-flip rendering was specifically tuned for WebKit.
       use: { ...devices['iPad Mini'], browserName: 'webkit' },
