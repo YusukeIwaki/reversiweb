@@ -118,6 +118,30 @@ test.describe('game-end overlay', () => {
     });
   }
 
+  test('reset button reloads the page to the initial state', async ({ page }) => {
+    await injectGameOver(page, buildBlackWinsBoard());
+    await expect(page.locator('#overlay')).toHaveClass(/\bvisible\b/);
+
+    const resetBtn = page.locator('.overlay-reset');
+    await expect(resetBtn).toBeVisible();
+    await expect(resetBtn).toHaveText('リセット');
+
+    // The overlay backdrop has pointer-events: none; the button must opt in
+    // so the click actually lands on it. Verify by capturing the reload
+    // navigation and re-checking the initial board.
+    await Promise.all([
+      page.waitForEvent('load'),
+      resetBtn.click(),
+    ]);
+
+    await page.waitForSelector('.cell .piece');
+    await expect(page.locator('.piece')).toHaveCount(4);
+    await expect(page.locator('#hand-black .hand-piece')).toHaveCount(30);
+    await expect(page.locator('#hand-white .hand-piece')).toHaveCount(30);
+    await expect(page.locator('#overlay')).not.toHaveClass(/\bvisible\b/);
+    await expect(page.locator('#player-black.active')).toHaveCount(1);
+  });
+
   test('overlay hides again once the state is no longer gameOver', async ({ page }) => {
     await injectGameOver(page, buildDrawBoard());
     await expect(page.locator('#overlay')).toHaveClass(/\bvisible\b/);

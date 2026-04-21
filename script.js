@@ -221,6 +221,8 @@
       overlayEl.classList.add('visible');
       overlayEl.setAttribute('aria-hidden', 'false');
       overlayEl.innerHTML = renderOutcomeCard(outcome);
+      const resetBtn = overlayEl.querySelector('.overlay-reset');
+      if (resetBtn) resetBtn.addEventListener('click', () => location.reload());
     }
   }
 
@@ -236,7 +238,7 @@
     return `
       <div class="overlay-card">
         <div class="overlay-illust" aria-label="${caption}">${svg}</div>
-        <div class="overlay-caption">${caption}</div>
+        <button type="button" class="overlay-reset">リセット</button>
       </div>
     `;
   }

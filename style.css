@@ -350,13 +350,38 @@ html, body {
   width: 100%;
   height: auto;
 }
-.overlay-caption {
-  font-size: 20px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 0.06em;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
-  opacity: 0.85;
+/* The only interactive element inside the overlay. The overlay itself has
+   pointer-events: none so clicks don't hit the hidden board behind it, so
+   this button must opt back in explicitly. Pressing it reloads the page —
+   that's the only in-app way to reset mid-game state (see SPEC.md §2). */
+.overlay-reset {
+  pointer-events: auto;
+  font: 700 18px/1 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  letter-spacing: 0.08em;
+  color: #1a1a1a;
+  background: linear-gradient(180deg, #ffffff 0%, #e8e8e8 100%);
+  border: 2px solid #1a1a1a;
+  border-radius: 999px;
+  padding: 12px 36px;
+  cursor: pointer;
+  box-shadow:
+    0 4px 0 #1a1a1a,
+    0 8px 18px rgba(0, 0, 0, 0.45);
+  transition: transform 0.08s ease-out, box-shadow 0.08s ease-out;
+  -webkit-tap-highlight-color: transparent;
+}
+.overlay-reset:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #f0f0f0 100%);
+}
+.overlay-reset:active {
+  transform: translateY(3px);
+  box-shadow:
+    0 1px 0 #1a1a1a,
+    0 3px 8px rgba(0, 0, 0, 0.45);
+}
+.overlay-reset:focus-visible {
+  outline: 3px solid #ffe27a;
+  outline-offset: 3px;
 }
 
 @keyframes overlay-fade {
