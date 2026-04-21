@@ -222,8 +222,33 @@
       overlayEl.setAttribute('aria-hidden', 'false');
       overlayEl.innerHTML = renderOutcomeCard(outcome);
       const resetBtn = overlayEl.querySelector('.overlay-reset');
-      if (resetBtn) resetBtn.addEventListener('click', () => location.reload());
+      if (resetBtn) resetBtn.addEventListener('click', resetGame);
     }
+  }
+
+  // Reset from the game-over overlay. We *cannot* simply `location.reload()`:
+  // the finished game's pushState entries would still be reachable via the
+  // browser's back button, letting the user "undo" past the reset (#2).
+  // Instead, navigate back to the boot entry and then pushState a fresh
+  // entry — pushState prunes the old forward entries, so the just-played
+  // game is no longer in the history stack.
+  function resetGame() {
+    const idx = history.state?.idx ?? 0;
+    if (idx === 0) {
+      state = initialState();
+      history.replaceState({ state: clone(state), idx: 0 }, '');
+      snapRender();
+      return;
+    }
+    const onPop = () => {
+      window.removeEventListener('popstate', onPop);
+      state = initialState();
+      const nextIdx = (history.state?.idx ?? 0) + 1;
+      history.pushState({ state: clone(state), idx: nextIdx }, '');
+      snapRender();
+    };
+    window.addEventListener('popstate', onPop);
+    history.go(-idx);
   }
 
   // ---------- End-of-game illustration ----------
@@ -468,7 +493,8 @@
     showHints();
 
     // 4) push history
-    history.pushState({ state: clone(state) }, '');
+    const nextIdx = (history.state?.idx ?? 0) + 1;
+    history.pushState({ state: clone(state), idx: nextIdx }, '');
 
     // 5) wait for the in-flight coin-flip to finish before unblocking input.
     await sleep(FLIP_ANIM_MS);
@@ -499,7 +525,7 @@
   function boot() {
     buildBoard();
     state = initialState();
-    history.replaceState({ state: clone(state) }, '');
+    history.replaceState({ state: clone(state), idx: 0 }, '');
     snapRender();
   }
 

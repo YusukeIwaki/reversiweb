@@ -118,7 +118,7 @@ test.describe('game-end overlay', () => {
     });
   }
 
-  test('reset button reloads the page to the initial state', async ({ page }) => {
+  test('reset button returns the board to the initial state', async ({ page }) => {
     await injectGameOver(page, buildBlackWinsBoard());
     await expect(page.locator('#overlay')).toHaveClass(/\bvisible\b/);
 
@@ -127,19 +127,61 @@ test.describe('game-end overlay', () => {
     await expect(resetBtn).toHaveText('リセット');
 
     // The overlay backdrop has pointer-events: none; the button must opt in
-    // so the click actually lands on it. Verify by capturing the reload
-    // navigation and re-checking the initial board.
-    await Promise.all([
-      page.waitForEvent('load'),
-      resetBtn.click(),
-    ]);
+    // so the click actually lands on it. No full-page reload happens anymore
+    // (see the regression test below for why) — we just verify the board
+    // snaps back to the opening position.
+    await resetBtn.click();
 
-    await page.waitForSelector('.cell .piece');
     await expect(page.locator('.piece')).toHaveCount(4);
     await expect(page.locator('#hand-black .hand-piece')).toHaveCount(30);
     await expect(page.locator('#hand-white .hand-piece')).toHaveCount(30);
     await expect(page.locator('#overlay')).not.toHaveClass(/\bvisible\b/);
     await expect(page.locator('#player-black.active')).toHaveCount(1);
+  });
+
+  // Regression for https://github.com/YusukeIwaki/reversiweb/issues/2
+  // Pre-fix, the reset button called location.reload(), which preserves
+  // the browser history stack. Pressing back after reset would replay
+  // `popstate` with a mid-game entry and resurrect the finished game.
+  test('reset clears history so browser back cannot restore the finished game', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('.cell .piece');
+
+    // Play one real move so the history has a non-boot entry to prune.
+    await page.locator('.cell[data-r="2"][data-c="3"]').click();
+    await expect(page.locator('#hand-black .hand-piece')).toHaveCount(29);
+    await page.waitForTimeout(1300); // flip + pushState settles
+
+    // Simulate a game-over entry chained onto the real pushState above so
+    // the reset handler sees idx > 0 and exercises the history.go() path.
+    await page.evaluate(() => {
+      const board = Array.from({ length: 8 }, () => Array(8).fill(1));
+      board[0][0] = 2;
+      const nextIdx = (history.state?.idx ?? 0) + 1;
+      const fake = {
+        state: { board, turn: 1, handBlack: 0, handWhite: 0, gameOver: true },
+        idx: nextIdx,
+      };
+      history.pushState(fake, '');
+      window.dispatchEvent(new PopStateEvent('popstate', { state: fake }));
+    });
+    await expect(page.locator('#overlay')).toHaveClass(/\bvisible\b/);
+
+    await page.locator('.overlay-reset').click();
+
+    // Reset restored the initial board without a full reload.
+    await expect(page.locator('.piece')).toHaveCount(4);
+    await expect(page.locator('#overlay')).not.toHaveClass(/\bvisible\b/);
+    await expect(page.locator('#hand-black .hand-piece')).toHaveCount(30);
+
+    // Press back: the finished game's entries must have been pruned.
+    // The only reachable back entry is the fresh boot state.
+    await page.goBack();
+    await page.waitForTimeout(300);
+    await expect(page.locator('.piece')).toHaveCount(4);
+    await expect(page.locator('#overlay')).not.toHaveClass(/\bvisible\b/);
+    await expect(page.locator('#hand-black .hand-piece')).toHaveCount(30);
+    await expect(page.locator('#hand-white .hand-piece')).toHaveCount(30);
   });
 
   test('overlay hides again once the state is no longer gameOver', async ({ page }) => {

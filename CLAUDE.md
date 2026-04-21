@@ -160,7 +160,8 @@ git add demo.gif && git commit -m "Refresh demo.gif"
 
 ## 触るときの注意
 
-- 対局中はリセット UI を持たない（仕様）。ただし **ゲーム終了オーバーレイ内のリセットボタンは例外として許可**。オーバーレイの `.overlay-reset` がそれで、クリックで `location.reload()` して初期盤面からやり直す（SPEC §2 参照）。この例外を広げない（タイトルバー等に途中リセットを足さない）。
+- 対局中はリセット UI を持たない（仕様）。ただし **ゲーム終了オーバーレイ内のリセットボタンは例外として許可**。オーバーレイの `.overlay-reset` がそれで、クリックで `resetGame()` が走り初期盤面からやり直す（SPEC §2 参照）。この例外を広げない（タイトルバー等に途中リセットを足さない）。
+- **リセット時の履歴クリア（issue #2）**: `resetGame()` は `location.reload()` ではなく `history.go(-idx)` → `pushState` で履歴を畳む。各 history エントリに `idx`（ブートから何手目か）を埋めてあり、リセット時は `history.go(-idx)` でブートエントリまで戻ったあと `pushState` することで、直前までプレイしていたゲームの中間エントリを forward 履歴ごとプルーニングする（`pushState` は仕様上 forward 側を消す）。`location.reload()` だとブラウザの戻るボタンで対局中の盤面に戻れてしまう回帰があるので戻さない。ブートエントリは常に `initialState` のままなので、リセット後に戻るを押しても同じフレッシュ盤面が映り、もう一度戻るでサイト外に抜ける。
 - `script.js` の `FLIP_DELAY_START_MS = 800`、`FLIP_INTERVAL_MS = 200`、`FLIP_ANIM_MS = 450`、`FLIP_GROUP_GAP_MS = 300` は仕様値。変える場合は `tests/ipad.spec.mjs` の `waitForTimeout`、`tests/flip-order.spec.mjs` の期待値、`@keyframes coin-flip` の duration をセットで見直す。
 - `state.handBlack` / `state.handWhite` の初期値は `30`（盤上 4 枚は手元 32 枚から 2 枚ずつ出した残）。見た目を「32 枚揃っている物理トレイ」に寄せたくなっても、**state 値を動かさずに CSS 側で演出する** 方針（ロジック・テスト・SPEC の一貫性を壊さない）。
 - `clone(state)` は浅すぎるとバグる（`board` が共有されると履歴が壊れる）。`script.js` の `clone()` は `board.map(row => row.slice())` で行コピーしている。新しい配列フィールドを足すときは `clone()` の更新を忘れないこと。
