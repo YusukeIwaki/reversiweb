@@ -29,15 +29,17 @@ test.describe('dirKind', () => {
     expect(r.down).toBe('v');
     expect(r.left).toBe('h');
     expect(r.right).toBe('h');
-    expect(r.ul).toBe('d');
-    expect(r.ur).toBe('d');
-    expect(r.dl).toBe('d');
-    expect(r.dr).toBe('d');
+    // \ axis: up-left and down-right share d1
+    expect(r.ul).toBe('d1');
+    expect(r.dr).toBe('d1');
+    // / axis: up-right and down-left share d2
+    expect(r.ur).toBe('d2');
+    expect(r.dl).toBe('d2');
   });
 });
 
 test.describe('groupAndSortLines', () => {
-  test('orders groups by total piece count desc (v=2, h=1, d=3 → d, v, h)', async ({ page }) => {
+  test('orders groups by total piece count desc (v=2, h=1, d2=3 → d2, v, h)', async ({ page }) => {
     const kinds = await page.evaluate(() => {
       return window.ReversiFlipOrder.groupAndSortLines([
         { dir: [-1, 0], line: [[2,3],[1,3]] },
@@ -45,18 +47,19 @@ test.describe('groupAndSortLines', () => {
         { dir: [-1, 1], line: [[3,4],[2,5],[1,6]] },
       ]).map(g => g.kind);
     });
-    expect(kinds).toEqual(['d', 'v', 'h']);
+    expect(kinds).toEqual(['d2', 'v', 'h']);
   });
 
-  test('breaks ties with vertical > horizontal > diagonal', async ({ page }) => {
+  test('breaks ties with vertical > horizontal > \\ > /', async ({ page }) => {
     const kinds = await page.evaluate(() => {
       return window.ReversiFlipOrder.groupAndSortLines([
+        { dir: [-1, 1], line: [[3,5]] },
         { dir: [0, 1], line: [[4,5]] },
         { dir: [1, 0], line: [[5,3]] },
         { dir: [1, 1], line: [[5,4]] },
       ]).map(g => g.kind);
     });
-    expect(kinds).toEqual(['v', 'h', 'd']);
+    expect(kinds).toEqual(['v', 'h', 'd1', 'd2']);
   });
 
   test('merges multiple lines of the same kind into one group', async ({ page }) => {
@@ -72,6 +75,22 @@ test.describe('groupAndSortLines', () => {
     expect(out[0].lines).toHaveLength(2);
     expect(out[1].kind).toBe('h');
     expect(out[1].lines).toHaveLength(1);
+  });
+
+  test('splits \\ and / diagonals into separate groups (issue #1)', async ({ page }) => {
+    const out = await page.evaluate(() => {
+      return window.ReversiFlipOrder.groupAndSortLines([
+        { dir: [-1, -1], line: [[3,3],[2,2]] },  // \ axis (up-left)
+        { dir: [ 1,  1], line: [[5,5]] },         // \ axis (down-right)
+        { dir: [-1,  1], line: [[3,5]] },         // / axis (up-right)
+        { dir: [ 1, -1], line: [[5,3]] },         // / axis (down-left)
+      ]).map(g => ({ kind: g.kind, lineCount: g.lines.length }));
+    });
+    // \ axis has 3 pieces total, / axis has 2 → d1 before d2 by count.
+    expect(out).toEqual([
+      { kind: 'd1', lineCount: 2 },
+      { kind: 'd2', lineCount: 2 },
+    ]);
   });
 
   test('empty input yields empty array', async ({ page }) => {
