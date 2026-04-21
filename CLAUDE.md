@@ -63,7 +63,7 @@ npm run test:flip-order        # flip-order.js の単体テストのみ
 
 1. 即座にコマ DOM 追加 + `state.board` と `handX` 更新 + UI 反映。
 2. `await sleep(800)` ← 仕様の「0.8 秒待つ」ゲート。
-3. 反転対象の line を「縦 / 横 / 斜め(\\) / 斜め(/)」の 4 グループに仕分け、**グループを枚数降順（同数時は 縦>横>\\>/）で順次実行**。斜めは 2 軸に分けてあるので `\` 軸と `/` 軸の石が同時にフリップすることはない（issue #1 の修正）。グループ内は `Promise.all` で line を並列起動、line 内は 200ms 間隔。各石は `flipPieceAnimated()` を起点に「フリップアニメ開始」と同時に `state.board[fr][fc]` を更新。
+3. 反転対象の line を「縦 / 横 / 斜め」の 3 グループに仕分け、**グループを枚数降順（同数時は 縦>横>斜）で順次実行**。グループ内は `Promise.all` で line を並列起動、line 内は 200ms 間隔。各石は `flipPieceAnimated()` を起点に「フリップアニメ開始」と同時に `state.board[fr][fc]` を更新。
 4. グループとグループの間は `FLIP_ANIM_MS (450) + FLIP_GROUP_GAP_MS (300)` = 750ms 空ける（前グループの最後の反転アニメが終わってから 300ms の静止を挟む）。
 5. 全グループのキックオフ完了 (= 最後のグループの最後のフリップが「始まった」瞬間) でターン切替・UI 更新・`pushState`。
 6. 最後に `await sleep(FLIP_ANIM_MS)` してアニメーション完了を待ち、`animating = false`。

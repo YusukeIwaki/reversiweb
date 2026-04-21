@@ -8,23 +8,20 @@
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.ReversiFlipOrder = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
-  // Tie-breaker priority: smaller wins, so vertical > horizontal > \ > /.
-  // Diagonals split by axis so a move that flips along both \ and / runs them
-  // one axis at a time rather than simultaneously (issue #1).
-  const KIND_PRIORITY = { v: 0, h: 1, d1: 2, d2: 3 };
+  // Tie-breaker priority: smaller wins, so vertical > horizontal > diagonal.
+  const KIND_PRIORITY = { v: 0, h: 1, d: 2 };
 
   function dirKind(dr, dc) {
     if (dc === 0) return 'v';
     if (dr === 0) return 'h';
-    // dr*dc > 0 → \ axis (up-left/down-right); < 0 → / axis (up-right/down-left).
-    return dr * dc > 0 ? 'd1' : 'd2';
+    return 'd';
   }
 
   // Input: flipsForMove output — [{dir:[dr,dc], line:[[r,c],...]}, ...]
   // Output: [{kind, lines:[[[r,c],...],...]}, ...] ordered by total piece
-  //   count descending, ties broken by KIND_PRIORITY (v,h,d1,d2).
+  //   count descending, ties broken by KIND_PRIORITY (v,h,d).
   function groupAndSortLines(lines) {
-    const groups = { v: [], h: [], d1: [], d2: [] };
+    const groups = { v: [], h: [], d: [] };
     for (const { dir, line } of lines) groups[dirKind(dir[0], dir[1])].push(line);
     const countOf = (ls) => ls.reduce((s, l) => s + l.length, 0);
     return Object.keys(groups)
